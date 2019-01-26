@@ -16,6 +16,8 @@ import numpy as np
 import tf_util
 import gym
 import load_policy
+import model
+
 
 def main():
     import argparse
@@ -49,7 +51,7 @@ def main():
             totalr = 0.
             steps = 0
             while not done:
-                action = policy_fn(obs[None,:])
+                action = policy_fn(obs[None, :])
                 observations.append(obs)
                 actions.append(action)
                 obs, r, done, _ = env.step(action)
@@ -69,8 +71,26 @@ def main():
         expert_data = {'observations': np.array(observations),
                        'actions': np.array(actions)}
 
-        with open(os.path.join('expert_data', args.envname + '.pkl'), 'wb') as f:
-            pickle.dump(expert_data, f, pickle.HIGHEST_PROTOCOL)
+        our_model = model.Model(expert_data['observations'], expert_data['actions'], args.envname[:-3],
+                                "behavior_cloning")
+        our_model.train()
+
+        for i in range(5):
+            obs = env.reset()
+            done = False
+            totalr = 0.
+            steps = 0
+            while not done:
+                action = our_model.sample(obs)
+                obs, r, done, _ = env.step(action)
+                totalr += r
+                steps += 1
+                env.render()
+                if steps % 100 == 0: print("%i/%i" % (steps, max_steps))
+                if steps >= max_steps:
+                    break
+        # with open(os.path.join('expert_data', args.envname + '.pkl'), 'wb') as f:
+        #     pickle.dump(expert_data, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     main()
