@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--max_timesteps", type=int)
     parser.add_argument('--num_rollouts', type=int, default=20,
                         help='Number of expert roll outs')
+    parser.add_argument('--DAgger_iter', type=int, default=5)
     args = parser.parse_args()
 
     print('loading and building expert policy')
@@ -74,27 +75,31 @@ def main():
         with open(os.path.join('expert_data', args.envname + '.pkl'), 'rb') as f:
             expert_data = pickle.load(f)
 
-        our_model = model.Model(expert_data['observations'], expert_data['actions'],
-                                args.envname[:-3], "behavior_cloning")
+        training_obs = expert_data['observations']
+        training_actions = expert_data['actions']
+
+        our_model = model.Model(expert_data['observations'], expert_data['actions'], args.envname[:-3], 'DAgger')
         our_model.train()
 
-        for i in range(5):
+        for i in range(args.DAgger_iter):
+            new_obs = []
+            new_actions = []
             obs = env.reset()
             done = False
-            totalr = 0.
-            steps = 0
             while not done:
                 action = our_model.sample(obs)
-                obs, r, done, _ = env.step(action)
-                totalr += r
-                steps += 1
-                env.render()
-                if steps % 100 == 0:
-                    print("%i/%i" % (steps, max_steps))
+                obs, _, done, _ = env.step(action)
+                if args.render:
+                    env.render()
+                corrected_action = policy_fn(obs[None, :])
+                new_obs.append(obs)
+                new_actions.append(corrected_action)
 
-                if steps >= max_steps:
-                    break
-
+            training_obs = np.concatenate((training_obs, obs[None, :]), axis=0)
+            training_actions = np.concatenate((training_actions, corrected_action[None, :]), axis=0)
+            our_model.train(train_data=np.array(new_obs), test_data=np.array(new_actions), number=i)
 
 if __name__ == '__main__':
     main()
+
+
