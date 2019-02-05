@@ -80,10 +80,10 @@ def main():
 
         our_model = model.Model(expert_data['observations'], expert_data['actions'], args.envname[:-3], 'DAgger')
         our_model.train()
-
         for i in range(args.DAgger_iter):
-            new_obs = []
-            new_actions = []
+            new_obs = np.empty_like(expert_data['observations'][0][None, :])
+            new_actions = np.empty_like(expert_data['actions'][0][None, :])
+
             obs = env.reset()
             done = False
             while not done:
@@ -92,12 +92,13 @@ def main():
                 if args.render:
                     env.render()
                 corrected_action = policy_fn(obs[None, :])
-                new_obs.append(obs)
-                new_actions.append(corrected_action)
+                new_obs = np.concatenate((new_obs, obs[None, :]), axis=0)
+                new_actions = np.concatenate((new_actions, corrected_action[None, :]), axis=0)
 
-            training_obs = np.concatenate((training_obs, obs[None, :]), axis=0)
-            training_actions = np.concatenate((training_actions, corrected_action[None, :]), axis=0)
-            our_model.train(train_data=np.array(new_obs), test_data=np.array(new_actions), number=i)
+            training_obs = np.concatenate((training_obs, new_obs), axis=0)
+            training_actions = np.concatenate((training_actions, new_actions), axis=0)
+            our_model.train(train_data=training_obs, test_data=training_actions, number=i)
+
 
 if __name__ == '__main__':
     main()
