@@ -1,6 +1,8 @@
 import tensorflow as tf
+# from tensorflow.contrib.data import Da
 import numpy as np
 from sklearn.utils import shuffle
+# from tensorflow.data import Dataset, Iterator
 
 
 class Model(object):
@@ -37,13 +39,24 @@ class Model(object):
         else:
             test_data = np.reshape(test_data, (test_data.shape[0], test_data.shape[2]))
 
-        dx = tf.data.Dataset.from_tensor_slices(train_data)
-        dy = tf.data.Dataset.from_tensor_slices(test_data)
+        # create TensorFlow Dataset objects
+        tr_data = tf.data.Dataset.from_tensor_slices((train_data, test_data)).batch(self.batch_size)
 
-        dcomb = tf.data.Dataset.zip((dx, dy)).repeat(epochs*50).batch(self.batch_size)
+        # create TensorFlow Iterator object
+        iterator = tf.data.Iterator.from_structure(tr_data.output_types, tr_data.output_shapes)
 
-        iterator = dcomb.make_one_shot_iterator()
         next_element = iterator.get_next()
+
+        training_init_op = iterator.make_initializer(tr_data)
+
+        self.sess.run(training_init_op)
+        # dx = tf.data.Dataset.from_tensor_slices(train_data)
+        # dy = tf.data.Dataset.from_tensor_slices(test_data)
+
+        # dcomb = tf.data.Dataset.zip((dx, dy)).repeat(epochs*5000).batch(self.batch_size)
+        #
+        # iterator = dcomb.make_one_shot_iterator()
+        # next_element = iterator.get_next()
         # extract an element
         saver = tf.train.Saver()
 
